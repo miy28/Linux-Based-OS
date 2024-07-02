@@ -1,0 +1,105 @@
+Bug: "No Such instruction" error generated on make
+Cause: Assembly code incorrectly integrated into C
+Fix: Properly include wrappers for assembly code in header file
+
+Bug: Double fault triggered on every exception
+Cause: Interrupts not turned off while exceptions are being handled
+Fix: STI() and CLI()
+
+Bug: No response from keyboard or RTC
+Cause: Wrong port # in IDT table
+Fix: Include Correct entry number
+
+Bug: Using Keyboard triggers Segment Not Present exception
+Cause: Present bit was only set for exceptions
+Fix: Set present bit to 1 for all entries in IDT
+
+Bug: keyboard keys would not show up
+
+Fix: the port that we mapped the keyboard to was not the right port in the IDT hence the keyboard wasn’t obtaining the correct inputs. We had it set to some sort of default value before and now we changed the input so that we could correctly apply the input and then move from there
+
+ 
+
+Bug: PIC enabling interrupts
+
+Fix: For some reason all the interrupts were being enabled in the PIC when it was being initialized in the kernel. This was leading to multiple interrupts being called which was triggering an exception that we didn’t want. We fixed this by shifting the master and slave masking portions to the bottom of the PIC initialization function instead of the top and that fixed the overall issue. 
+
+ 
+
+Bug: Paging Assembly Registers
+
+Fix: The kernel was crashing. We used GDB and narrowed it down to the assembly section where were using the wrong register to move the value in eax; hence we got a system crash. Once we fixed the register we were good to go.
+
+
+Bug: RTC only triggerred once
+Cause: PIC EOI incorrect, when the slave is active doesn't send a signal to the master
+Fix: Send a ping to port 2 of the master in send_eoi
+
+Bug: Scrolling only occurs when enter pressed
+Cause: Scolling code only in "enter" character handler
+Fix: Add scrolling code to line overflow section of putc as well
+
+Bug: unable to echo the character to the terminal to prove read and write functionality
+
+Fix: I realized I was not calling the terminal read function anywhere so the flag would be triggered on enter but it would not do anything since the function wasn’t being called in the first place. Once I called it and called write as well, I was able to hit enter and the things I typed in popped up only on the first enter so it checks out 
+
+
+Bug: unable to remove “L” from the buffer once I hit control L
+
+Fix: I realized once I hit ctrl L that my l would get stored in the buffer for when the key would get pressed; this is because the ctrl L was not being handled as its own case and the L was being handled as the default case which lead to the buffer loading it in. We are officially done with that now after creating an individual case for ctrl + L.
+
+Bug: PCB current id vs PCB parent id
+- We were accessing the wrong id (parent id instead of the current id) and that lead to us
+having the incorrect esp values at first when we were first trying to restore the registers
+from halt. Once we switched the ids to the current ones instead of the parent ones, we
+were able to restore the registers properly.
+
+Bug: mistyping the filename produced erroneous data
+- When we mistyped random letters for the file names after typing in a correct one, it
+would give us outputs based on the previous. That was based on the dentry not being
+cleared in the file system which cleared the dentry prior to a new one being established
+and it worked
+
+Bug: kernel paging initialization was not set
+- We didn’t have paging initialized in the kernel and it looked like we were getting to all the
+break points after running execute and halt but we were not able to get the proper user
+address for the program to begin with so we weren’t getting the expected behavior. But
+once paging was initialized, we were able to fix this issue
+
+Bug: Cursor won't follow shell
+ - Cursor was only moved in the keyboard code, this worked previous weeks but led to incorrect behavior when the shell started printing thigs
+
+Bug: syserror test 1 was not outputting anything but the rest of the tests did
+
+In order to fix this we needed to make sure that the fd was in the correct range, this is because the negative number passed correlated with std_out and prevented further printing after it got disabled. At first we just checked if it was greater than 1 but we also needed to check whether it was less than 7. Once we did that, we were able to get the desired output
+
+
+Bug: was unable to print out the files properly on LS
+
+The problem was in directory read and we realized that we were not passing the buf into the return statement at the end which had all the files; instead we were passing in dentry.filename. This also made sense as to why when we GDB’d we saw that there were files being populated but it failed at the very end.
+
+
+Bug: cat repeatedly printed the contents of the file
+
+The problem was that the code expected us to progress through the file while we read it, the way our code operated we were just reading from the same place over and over and never changed the number of bytes read. We included a term signifying the location in the file and incremented it by nbytes
+
+
+Bug: mistyping an executable, or attempting to open a file via shell would lead to a page fault.
+
+This is because the way we handled it in the execution system call was to return -1, which lead to a crash on process 0, e.g. the base level of the shell. We fixed it by instead rebooting the shell
+
+Bug: Vidmap caused page fault when fish is run
+Cause: In page RW bit wasnt set propertly, and in read data the way read data was working to fill the buffer misssed bytes towards the end
+Solution: Set RW to 1 in vidmap paging and simplified the loop calculation in read data, and incremented the pointer to get all the bits in the file
+
+Bug: Switching terminals while another program is running allowed the program to continue executing in the new terminal
+Solution: Halt the previous program in the first terminal, this would have otherwise been handled by scheduling, which we didn't implement
+
+Bug: Pingpong and fish are too slow
+Cause: In a previous checkpoint we used different arguments for rtc, and ended up using nbytes to hold the rate when we converted our code
+Solution: converted the buffer to an int and passed it to the switch
+
+Bug: Grep printed out all files when not given an argument
+Cause: sys_getargs didn't actually check whether the args it was returning were longer than 0
+Fix: add an if statement to ensure the arguments exist, otherwise return -1;
+
